@@ -1,0 +1,166 @@
+{
+  "name": "china-ai-providers",
+  "displayName": "国内AI适配插件",
+  "description": "将国内AI厂商(DeepSeek/通义千问/智谱/Kimi/小米MiMo等)注册为VS Code Copilot原生模型供应商",
+  "version": "0.1.0",
+  "publisher": "china-ai",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languageModelChatProviders": [
+      {
+        "vendor": "deepseek",
+        "displayName": "DeepSeek",
+        "configuration": {
+          "type": "object",
+          "required": ["apiKey"],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "API Key",
+              "description": "API key for DeepSeek (https://platform.deepseek.com/api_keys)",
+              "secret": true
+            },
+            "thinkingMode": {
+              "type": "string",
+              "title": "Thinking Mode",
+              "description": "Thinking mode for reasoning models",
+              "enum": ["enabled", "disabled"],
+              "enumDescriptions": ["Enabled", "Disabled"],
+              "default": "enabled"
+            }
+          }
+        }
+      },
+      {
+        "vendor": "qwen",
+        "displayName": "通义千问",
+        "configuration": {
+          "type": "object",
+          "required": ["apiKey"],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "API Key",
+              "description": "API key for Qwen (https://dashscope.console.aliyun.com/apiKey)",
+              "secret": true
+            },
+            "thinkingMode": {
+              "type": "string",
+              "title": "Thinking Mode",
+              "description": "Thinking mode for Qwen reasoning models",
+              "enum": ["enabled", "disabled"],
+              "enumDescriptions": ["Enabled", "Disabled"],
+              "default": "enabled"
+            }
+          }
+        }
+      },
+      {
+        "vendor": "xiaomi",
+        "displayName": "小米 MiMo",
+        "configuration": {
+          "type": "object",
+          "required": ["apiKey"],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "API Key",
+              "description": "API key for MiMo (https://platform.xiaomimimo.com)",
+              "secret": true
+            },
+            "thinkingMode": {
+              "type": "string",
+              "title": "Thinking Mode",
+              "description": "Thinking mode for MiMo reasoning models",
+              "enum": ["enabled", "disabled"],
+              "enumDescriptions": ["Enabled", "Disabled"],
+              "default": "enabled"
+            }
+          }
+        }
+      },
+      {
+        "vendor": "zhipu",
+        "displayName": "智谱GLM",
+        "configuration": {
+          "type": "object",
+          "required": ["apiKey"],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "API Key",
+              "description": "API key for Zhipu (https://open.bigmodel.cn/usercenter/apikeys)",
+              "secret": true
+            },
+            "thinkingMode": {
+              "type": "string",
+              "title": "Thinking Mode",
+              "description": "Thinking mode for Zhipu reasoning models",
+              "enum": ["enabled", "disabled"],
+              "enumDescriptions": ["Enabled", "Disabled"],
+              "default": "enabled"
+            }
+          }
+        }
+      },
+      {
+        "vendor": "kimi",
+        "displayName": "Kimi",
+        "configuration": {
+          "type": "object",
+          "required": ["apiKey"],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "API Key",
+              "description": "API key for Kimi (https://platform.moonshot.cn/console/api-keys)",
+              "secret": true
+            },
+            "thinkingMode": {
+              "type": "string",
+              "title": "Thinking Mode",
+              "description": "Kimi K2.6 thinking mode; K2.7 Code always requires thinking",
+              "enum": ["enabled", "disabled"],
+              "enumDescriptions": ["Enabled", "Disabled"],
+              "default": "enabled"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --preserveWatchOutput",
+    "package": "npm run check-types && node esbuild.js --production",
+    "compile-tests": "tsc -p . --outDir out",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "node --test --experimental-strip-types test/pure.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.100.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.7.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.24.2": true
+  }
+}
