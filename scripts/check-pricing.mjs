@@ -10,7 +10,6 @@
  * 输出：Markdown 格式的检测报告
  */
 
-import { readFileSync } from "node:fs";
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,29 +17,25 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
-// ── Playwright 可选加载 ──────────────────────────────────────
+// ── Playwright 加载 ──────────────────────────────────────
 let playwright = null;
-async function getPageContent(url) {
-  if (!playwright && process.env.USE_PLAYWRIGHT === "1") {
-    try {
-      playwright = await import("playwright");
-    } catch {
-      // Playwright 未安装，降级为普通 fetch
-    }
+
+/**
+ * 获取页面渲染后的纯文本（非原始 HTML）
+ * 关键：用 page.evaluate(() => document.body.innerText) 而非 page.content()
+ */
+async function getPageText(url) {
+  if (!playwright) {
+    try { playwright = await import("playwright"); } catch { return null; }
   }
-  if (playwright) {
-    const browser = await playwright.chromium.launch({ headless: true });
-    try {
-      const page = await browser.newPage();
-      await page.goto(url, { waitUntil: "networkidle", timeout: 15_000 });
-      return await page.content();
-    } finally {
-      await browser.close();
-    }
+  const browser = await playwright.chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle", timeout: 20_000 });
+    return await page.evaluate(() => document.body.innerText);
+  } finally {
+    await browser.close();
   }
-  // 降级：普通 fetch
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  return res.ok ? await res.text() : null;
 }
 
 // ── 实时汇率 ──────────────────────────────────────────────
@@ -94,27 +89,23 @@ function extractBundledPrices() {
 
 // ── 厂商抓取器 ──────────────────────────────────────────────
 
-/** DeepSeek: 抓取定价页面（SPA，Playwright 渲染） */
+/** DeepSeek: 获取渲染后的纯文本 */
 async function fetchDeepSeekPrices() {
   try {
-    const html = await getPageContent("https://api-docs.deepseek.com/quick_start/pricing");
-    return html ? { ok: true, raw: html, vendor: "deepseek" } : { ok: false, error: "空响应" };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
+    const text = await getPageText("https://api-docs.deepseek.com/quick_start/pricing");
+    return text ? { ok: true, text, vendor: "deepseek" } : { ok: false, error: "Playwright 未安装或页面加载失败" };
+  } catch (e) { return { ok: false, error: e.message }; }
 }
 
-/** MiMo: 抓取定价页面（SPA，Playwright 渲染） */
+/** MiMo: 获取渲染后的纯文本 */
 async function fetchMiMoPrices() {
   try {
-    const html = await getPageContent("https://mimo.mi.com/docs/price/pay-as-you-go");
-    return html ? { ok: true, raw: html, vendor: "xiaomi" } : { ok: false, error: "空响应" };
-  } catch (e) {
-    return { ok: false, error: e.message };
-  }
+    const text = await getPageText("https://mimo.mi.com/docs/price/pay-as-you-go");
+    return text ? { ok: true, text, vendor: "xiaomi" } : { ok: false, error: "Playwright 未安装或页面加载失败" };
+  } catch (e) { return { ok: false, error: e.message }; }
 }
 
-/** Kimi: 抓取各模型定价页面（SPA，Playwright 渲染） */
+/** Kimi: 获取各模型定价页面纯文本 */
 async function fetchKimiPrices() {
   const pages = [
     { model: "kimi-k3", url: "https://platform.kimi.com/docs/pricing/chat-k3" },
@@ -122,136 +113,139 @@ async function fetchKimiPrices() {
     { model: "kimi-k2.6", url: "https://platform.kimi.com/docs/pricing/chat-k26" },
   ];
   const results = [];
-  for (const page of pages) {
+  for (const p of pages) {
     try {
-      const html = await getPageContent(page.url);
-      if (html) {
-        results.push({ ...page, ok: true, raw: html });
-      } else {
-        results.push({ ...page, ok: false, error: "空响应" });
-      }
-    } catch (e) {
-      results.push({ ...page, ok: false, error: e.message });
-    }
+      const text = await getPageText(p.url);
+      results.push(text ? { ...p, ok: true, text } : { ...p, ok: false, error: "页面加载失败" });
+    } catch (e) { results.push({ ...p, ok: false, error: e.message }); }
   }
   return { ok: true, vendor: "kimi", pages: results };
 }
 
-/** 智谱: SPA 页面，需要 Playwright 渲染 */
+/** 智谱 */
 async function fetchZhipuPrices() {
-  if (process.env.USE_PLAYWRIGHT !== "1") {
-    return { ok: false, vendor: "zhipu", error: "React SPA，需要 Playwright，跳过" };
-  }
   try {
-    const html = await getPageContent("https://open.bigmodel.cn/pricing");
-    return html ? { ok: true, raw: html, vendor: "zhipu" } : { ok: false, vendor: "zhipu", error: "空响应" };
-  } catch (e) {
-    return { ok: false, vendor: "zhipu", error: e.message };
-  }
+    const text = await getPageText("https://open.bigmodel.cn/pricing");
+    return text ? { ok: true, text, vendor: "zhipu" } : { ok: false, vendor: "zhipu", error: "页面加载失败" };
+  } catch (e) { return { ok: false, vendor: "zhipu", error: e.message }; }
 }
 
-/** Qwen: 阿里云页面反爬严格 */
+/** Qwen */
 async function fetchQwenPrices() {
-  return {
-    ok: false,
-    vendor: "qwen",
-    error: "阿里云页面反爬严格，跳过自动检测",
-  };
+  return { ok: false, vendor: "qwen", error: "Qwen 定价分散在多个页面，暂不支持自动抓取" };
 }
 
 // ── 解析器 ──────────────────────────────────────────────────
 
-/** 从 HTML 解析 DeepSeek 定价 */
-function parseDeepSeekPricing(html, usdCny = DEFAULT_USD_CNY) {
+/**
+ * 从 DeepSeek 纯文本中解析定价
+ * 文本格式：
+ *   1M INPUT TOKENS (CACHE HIT) | OFF-PEAK | $0.007 | $0.022 | $0.007
+ *   1M INPUT TOKENS (CACHE MISS) | OFF-PEAK | $0.22 | $0.66 | $0.22
+ *   1M OUTPUT TOKENS | OFF-PEAK | $0.66 | $1.98 | $0.66
+ * 列顺序: [label] | [sublabel] | flash | pro | vision-exp
+ */
+function parseDeepSeekPricing(text, usdCny = DEFAULT_USD_CNY) {
   const results = [];
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
-  // 使用更精确的锚点避免跨行误匹配
-  // CACHE HIT off-peak
-  const hitMatch = html.match(
-    /1M INPUT TOKENS \(CACHE HIT\)[\s\S]*?OFF-PEAK[\s\S]*?\$([\d.]+)[\s\S]*?\$([\d.]+)[\s\S]*?\$([\d.]+)/i
-  );
-  // CACHE MISS off-peak
-  const missMatch = html.match(
-    /1M INPUT TOKENS \(CACHE MISS\)[\s\S]*?OFF-PEAK[\s\S]*?\$([\d.]+)[\s\S]*?\$([\d.]+)[\s\S]*?\$([\d.]+)/i
-  );
-  // OUTPUT off-peak
-  const outMatch = html.match(
-    /1M OUTPUT TOKENS[\s\S]*?OFF-PEAK[\s\S]*?\$([\d.]+)[\s\S]*?\$([\d.]+)[\s\S]*?\$([\d.]+)/i
-  );
+  let hitPrices = null, missPrices = null, outPrices = null;
 
-  if (missMatch && outMatch) {
-    const models = [
-      { name: "deepseek-v4-flash", mi: 1, mo: 1, hi: 1 },
-      { name: "deepseek-v4-pro", mi: 2, mo: 2, hi: 2 },
-      { name: "deepseek-v4-flash-vision-exp", mi: 3, mo: 3, hi: 3 },
-    ];
-    for (const m of models) {
-      results.push({
-        model: m.name,
-        inputPer1M: +(parseFloat(missMatch[m.mi]) * usdCny).toFixed(2),
-        outputPer1M: +(parseFloat(outMatch[m.mo]) * usdCny).toFixed(2),
-        cacheHitPer1M: hitMatch ? +(parseFloat(hitMatch[m.hi]) * usdCny).toFixed(2) : undefined,
-      });
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // 匹配价格行：包含 $ 和 OFF-PEAK
+    const priceMatch = line.match(/\$([\d.]+)\s*\|\s*\$([\d.]+)\s*\|\s*\$([\d.]+)/);
+    if (!priceMatch) continue;
+
+    // 往回找标签行
+    const context = lines.slice(Math.max(0, i - 3), i + 1).join(" ").toUpperCase();
+
+    if (context.includes("CACHE HIT") && context.includes("OFF-PEAK")) {
+      hitPrices = [parseFloat(priceMatch[1]), parseFloat(priceMatch[2]), parseFloat(priceMatch[3])];
+    } else if (context.includes("CACHE MISS") && context.includes("OFF-PEAK")) {
+      missPrices = [parseFloat(priceMatch[1]), parseFloat(priceMatch[2]), parseFloat(priceMatch[3])];
+    } else if (context.includes("OUTPUT") && context.includes("OFF-PEAK") && !context.includes("INPUT")) {
+      outPrices = [parseFloat(priceMatch[1]), parseFloat(priceMatch[2]), parseFloat(priceMatch[3])];
     }
   }
 
+  if (missPrices && outPrices) {
+    const models = ["deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-flash-vision-exp"];
+    for (let i = 0; i < models.length; i++) {
+      results.push({
+        model: models[i],
+        inputPer1M: +(missPrices[i] * usdCny).toFixed(2),
+        outputPer1M: +(outPrices[i] * usdCny).toFixed(2),
+        cacheHitPer1M: hitPrices ? +(hitPrices[i] * usdCny).toFixed(2) : undefined,
+      });
+    }
+  }
   return results;
 }
 
-/** 从 HTML 解析 MiMo 定价 */
-function parseMiMoPricing(html) {
-  // MiMo 定价表格: model | cache_hit | input | output
-  // HTML 中格式: mimo-v2.5-pro | ¥0.025 | ¥3.00 | ¥6.00
+/**
+ * 从 MiMo 纯文本中解析定价
+ * 文本格式：
+ *   mimo-v2.5-pro | ¥0.025 | ¥3.00 | ¥6.00
+ *   mimo-v2.5 | ¥0.02 | ¥1.00 | ¥2.00
+ * 列顺序: model | cache_hit | input | output
+ */
+function parseMiMoPricing(text) {
   const results = [];
-
-  // 匹配 mimo-v2.5-pro 行
-  const proMatch = html.match(
-    /mimo-v2\.5-pro[\s\S]*?¥([\d.]+)[\s\S]*?¥([\d.]+)[\s\S]*?¥([\d.]+)/i
-  );
-  if (proMatch) {
+  const regex = /(mimo-v2\.5\S*)\s*\|\s*¥([\d.]+)\s*\|\s*¥([\d.]+)\s*\|\s*¥([\d.]+)/g;
+  let m;
+  while ((m = regex.exec(text))) {
     results.push({
-      model: "mimo-v2.5-pro",
-      cacheHitPer1M: parseFloat(proMatch[1]),
-      inputPer1M: parseFloat(proMatch[2]),
-      outputPer1M: parseFloat(proMatch[3]),
+      model: m[1],
+      cacheHitPer1M: parseFloat(m[2]),
+      inputPer1M: parseFloat(m[3]),
+      outputPer1M: parseFloat(m[4]),
     });
   }
-
-  // 匹配 mimo-v2.5 行（排除 pro）
-  const baseMatch = html.match(
-    /mimo-v2\.5(?!-pro)[\s\S]*?¥([\d.]+)[\s\S]*?¥([\d.]+)[\s\S]*?¥([\d.]+)/i
-  );
-  if (baseMatch) {
-    results.push({
-      model: "mimo-v2.5",
-      cacheHitPer1M: parseFloat(baseMatch[1]),
-      inputPer1M: parseFloat(baseMatch[2]),
-      outputPer1M: parseFloat(baseMatch[3]),
-    });
-  }
-
   return results;
 }
 
-/** 从 HTML 解析 Kimi 定价 */
+/**
+ * 从 Kimi 纯文本中解析定价
+ * 文本格式（DocTable 渲染后）：
+ *   kimi-k3 | 1M tokens | ¥2.00 | ¥20.00 | ¥100.00 | 1,048,576 tokens
+ * 列顺序: model | unit | cache_hit | input | output | context
+ */
 function parseKimiPricing(pages) {
   const results = [];
   for (const page of pages) {
     if (!page.ok) continue;
-    // Kimi JSX DocTable 格式:
-    // rows={[["kimi-k3", "1M tokens", "¥2.00", "¥20.00", "¥100.00", "1,048,576 tokens"]]}
-    // 列: model | 计费单位 | 缓存命中 | 输入(未命中) | 输出 | 上下文
-    const rowMatch = page.raw.match(
-      /\["([^"]+)",\s*"1M tokens",\s*"¥([\d.]+)",\s*"¥([\d.]+)",\s*"¥([\d.]+)"/
-    );
-    if (rowMatch) {
+    const regex = /(kimi-k[\d.a-z-]+)\s*\|\s*1M tokens\s*\|\s*¥([\d.]+)\s*\|\s*¥([\d.]+)\s*\|\s*¥([\d.]+)/;
+    const m = page.text.match(regex);
+    if (m) {
       results.push({
-        model: rowMatch[1],
-        cacheHitPer1M: parseFloat(rowMatch[2]),
-        inputPer1M: parseFloat(rowMatch[3]),
-        outputPer1M: parseFloat(rowMatch[4]),
+        model: m[1],
+        cacheHitPer1M: parseFloat(m[2]),
+        inputPer1M: parseFloat(m[3]),
+        outputPer1M: parseFloat(m[4]),
       });
     }
+  }
+  return results;
+}
+
+/**
+ * 从智谱纯文本中解析定价
+ * 文本格式：
+ *   GLM-5.3 ... 输入单价8元 / M 输出单价28元 / M 缓存命中2元 / M
+ */
+function parseZhipuPricing(text) {
+  const results = [];
+  // 匹配 GLM-X.X 系列
+  const regex = /(GLM-[\d.]+(?:-Flash)?)\s+.*?输入单价([\d.]+)元\s*\/\s*M\s+输出单价([\d.]+)元\s*\/\s*M\s+缓存命中([\d.]+)元\s*\/\s*M/gi;
+  let m;
+  while ((m = regex.exec(text))) {
+    results.push({
+      model: m[1].toLowerCase(),
+      inputPer1M: parseFloat(m[2]),
+      outputPer1M: parseFloat(m[3]),
+      cacheHitPer1M: parseFloat(m[4]),
+    });
   }
   return results;
 }
@@ -320,12 +314,11 @@ async function main() {
   const bundled = extractBundledPrices();
   const allChanges = {};
   const errors = {};
-  const usedPlaywright = process.env.USE_PLAYWRIGHT === "1" && playwright;
 
   // 获取实时汇率
   const usdCny = await fetchUsdCnyRate();
 
-  // 并发抓取所有厂商
+  // 并发抓取所有厂商（Playwright 渲染后取 innerText）
   const [deepseek, mimo, kimi, zhipu, qwen] = await Promise.all([
     fetchDeepSeekPrices(),
     fetchMiMoPrices(),
@@ -336,11 +329,11 @@ async function main() {
 
   // DeepSeek
   if (deepseek.ok) {
-    const fetched = parseDeepSeekPricing(deepseek.raw, usdCny);
+    const fetched = parseDeepSeekPricing(deepseek.text, usdCny);
     if (fetched.length > 0) {
       allChanges.deepseek = diffVendor(bundled, fetched, "deepseek");
     } else {
-      errors.deepseek = "无法解析定价数据（HTML 中未找到价格表格）";
+      errors.deepseek = "无法从页面文本中解析定价数据";
     }
   } else {
     errors.deepseek = deepseek.error;
@@ -348,11 +341,11 @@ async function main() {
 
   // MiMo
   if (mimo.ok) {
-    const fetched = parseMiMoPricing(mimo.raw);
+    const fetched = parseMiMoPricing(mimo.text);
     if (fetched.length > 0) {
       allChanges.xiaomi = diffVendor(bundled, fetched, "xiaomi");
     } else {
-      errors.xiaomi = "无法解析定价数据（HTML 中未找到价格表格）";
+      errors.xiaomi = "无法从页面文本中解析定价数据";
     }
   } else {
     errors.xiaomi = mimo.error;
@@ -364,25 +357,31 @@ async function main() {
     if (fetched.length > 0) {
       allChanges.kimi = diffVendor(bundled, fetched, "kimi");
     } else {
-      errors.kimi = "无法解析定价数据（HTML 中未找到价格表格）";
+      errors.kimi = "无法从页面文本中解析定价数据";
     }
   } else {
     errors.kimi = kimi.error;
   }
 
-  // 智谱 & Qwen
-  errors.zhipu = zhipu.error;
+  // 智谱
+  if (zhipu.ok) {
+    const fetched = parseZhipuPricing(zhipu.text);
+    if (fetched.length > 0) {
+      allChanges.zhipu = diffVendor(bundled, fetched, "zhipu");
+    } else {
+      errors.zhipu = "无法从页面文本中解析定价数据";
+    }
+  } else {
+    errors.zhipu = zhipu.error;
+  }
+
+  // Qwen
   errors.qwen = qwen.error;
 
   // ── 输出报告 ──────────────────────────────────────────
   const now = new Date().toISOString().slice(0, 10);
   const lines = [`# 🔔 定价检测报告 — ${now}`, ""];
 
-  if (!usedPlaywright) {
-    lines.push("> ⚠️ **注意**: 未使用 Playwright，SPA 页面可能无法正确抓取。");
-    lines.push("> 在 GitHub Actions 中会自动安装 Playwright 进行完整检测。");
-    lines.push("");
-  }
 
   let hasChanges = false;
 

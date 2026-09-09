@@ -23,12 +23,10 @@ jobs:
           node-version: '20'
 
       - name: Install Playwright
-        run: npx playwright install chromium --with-deps
+        run: npm install playwright && npx playwright install chromium --with-deps
 
       - name: Run pricing check
         id: check
-        env:
-          USE_PLAYWRIGHT: '1'
         run: |
           node scripts/check-pricing.mjs > pricing-report.md 2>&1 || true
           echo "report<<EOF" >> $GITHUB_OUTPUT
