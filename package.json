@@ -12,6 +12,13 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "activationEvents": [
+    "onLanguageModelChatProvider:deepseek",
+    "onLanguageModelChatProvider:qwen",
+    "onLanguageModelChatProvider:zhipu",
+    "onLanguageModelChatProvider:kimi",
+    "onLanguageModelChatProvider:xiaomi"
+  ],
   "contributes": {
     "languageModelChatProviders": [
       {
@@ -134,7 +141,43 @@
           }
         }
       }
-    ]
+    ],
+    "commands": [
+      { "command": "china-ai.showBalance", "title": "国内AI: 查看当前厂商余额" },
+      { "command": "china-ai.showUsage", "title": "国内AI: 查看当前厂商今日用量" },
+      { "command": "china-ai.showCostDashboard", "title": "国内AI: 用量/余额数据面板" },
+      { "command": "china-ai.refreshBalance", "title": "国内AI: 刷新当前厂商余额" },
+      { "command": "china-ai.refreshPricing", "title": "国内AI: 刷新定价" },
+      { "command": "china-ai.switchVendor", "title": "国内AI: 切换当前厂商" },
+      { "command": "china-ai.openBillingConsole", "title": "国内AI: 打开账单控制台" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "china-ai.showBalance" },
+        { "command": "china-ai.showUsage" },
+        { "command": "china-ai.showCostDashboard" },
+        { "command": "china-ai.refreshBalance" },
+        { "command": "china-ai.refreshPricing" },
+        { "command": "china-ai.switchVendor" },
+        { "command": "china-ai.openBillingConsole" }
+      ]
+    },
+    "configuration": {
+      "title": "国内AI",
+      "properties": {
+        "china-ai.billing.statusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否在状态栏显示今日用量与余额"
+        },
+        "china-ai.billing.refreshIntervalSec": {
+          "type": "number",
+          "default": 60,
+          "minimum": 15,
+          "description": "状态栏余额自动刷新间隔（秒，最小 15）"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

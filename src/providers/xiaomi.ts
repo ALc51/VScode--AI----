@@ -17,6 +17,9 @@ export function createXiaomiConfig(): ProviderConfig {
     displayName: "小米 MiMo",
     defaultBaseUrl: API_BASE_URLS.xiaomi,
     modelsEndpoint: `${API_BASE_URLS.xiaomi}/v1/models`,
+    billingConsoleUrl: "https://platform.xiaomimimo.com",
+    supportsBalance: false,
+    includeStreamUsage: true,
     getAuthHeaders(apiKey: string) {
       return { Authorization: `Bearer ${apiKey}` };
     },
@@ -36,6 +39,7 @@ export function createXiaomiConfig(): ProviderConfig {
         stream: options.stream ?? true,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.max_tokens ?? 4096,
+        stream_options: { include_usage: true },
       };
       if (/reason|think|mimo/i.test(options.model)) {
         const reasoningEffort = options.modelOptions?.reasoningEffort

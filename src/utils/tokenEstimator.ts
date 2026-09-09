@@ -1,6 +1,7 @@
 /**
  * 简易 Token 估算器
  * CJK 字符约 1.5 字/token，英文/其他约 4 字符/token
+ * 对齐 opencode: char/4 + 10% codeBuffer + CJK 补偿
  */
 function isCjkChar(code: number): boolean {
   return (
@@ -15,9 +16,22 @@ function isCjkChar(code: number): boolean {
 }
 
 export function estimateTokens(text: string): number {
-  let count = 0;
-  for (const char of text) {
-    count += isCjkChar(char.codePointAt(0) ?? 0) ? 0.7 : 0.25;
-  }
-  return Math.max(1, Math.ceil(count));
+  if (!text) return 0;
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return 0;
+  const cjk = normalized.match(/[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]/gu)?.length ?? 0;
+  const charEstimate = Math.ceil(normalized.length / 4);
+  const codeBuffer = Math.ceil(charEstimate * 0.1);
+  return Math.max(1, Math.ceil(charEstimate + codeBuffer + cjk));
+}
+
+// 对齐 opencode 的开销常量
+export const MESSAGE_TOKEN_OVERHEAD = 4;
+export const MESSAGE_NAME_TOKEN_OVERHEAD = 1;
+export const TOOL_CALL_TOKEN_OVERHEAD = 10;
+export const TOOL_RESULT_TOKEN_OVERHEAD = 6;
+export const IMAGE_TOKEN_ESTIMATE = 1024;
+
+export function estimateStructuredTokenCount(value: unknown): number {
+  try { return estimateTokens(JSON.stringify(value)); } catch { return 0; }
 }

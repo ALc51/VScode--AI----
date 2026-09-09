@@ -14,6 +14,8 @@ export type ErrorKind =
   | "Cancelled"
   | "TimeoutError"
   | "ModelListError"
+  | "ModelListRetry"
+  | "ModelListFallback"
   | "Unknown";
 
 export interface LogContext {

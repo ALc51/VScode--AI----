@@ -2,6 +2,7 @@ import { getReasoningEffort } from "../types";
 import type { ProviderConfig, ChatRequestOptions, ChatStreamChunk } from "../types";
 import { API_BASE_URLS } from "../config/models";
 import { defaultGetModelMetadata, defaultGetVendorContextLimit } from "./modelMetadataStrategies";
+import { defaultParseBalanceResponse } from "./billingStrategies";
 import { defaultFormatModelDisplayName } from "./displayNameStrategies";
 import {
   defaultHasInferredImageInput,
@@ -18,6 +19,11 @@ export function createDeepseekConfig(): ProviderConfig {
     displayName: "DeepSeek",
     defaultBaseUrl: API_BASE_URLS.deepseek,
     modelsEndpoint: `${API_BASE_URLS.deepseek}/models`,
+    balanceEndpoint: `${API_BASE_URLS.deepseek}/user/balance`,
+    billingConsoleUrl: "https://platform.deepseek.com/usage",
+    supportsBalance: true,
+    parseBalanceResponse: defaultParseBalanceResponse("deepseek"),
+    includeStreamUsage: true,
     getAuthHeaders(apiKey: string) {
       return { Authorization: `Bearer ${apiKey}` };
     },
@@ -37,6 +43,7 @@ export function createDeepseekConfig(): ProviderConfig {
         stream: options.stream ?? true,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.max_tokens ?? 4096,
+        stream_options: { include_usage: true },
       };
       if (/reason|r1/i.test(options.model)) {
         const effort = options.modelOptions?.reasoningEffort

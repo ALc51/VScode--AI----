@@ -18,6 +18,9 @@ export function createZhipuConfig(): ProviderConfig {
     displayName: "智谱GLM",
     defaultBaseUrl: API_BASE_URLS.zhipu,
     modelsEndpoint: `${API_BASE_URLS.zhipu}/v4/models`,
+    billingConsoleUrl: "https://open.bigmodel.cn/usercenter/apikeys",
+    supportsBalance: false,
+    includeStreamUsage: true,
     getAuthHeaders(apiKey: string) {
       return { Authorization: `Bearer ${apiKey}` };
     },
@@ -37,6 +40,7 @@ export function createZhipuConfig(): ProviderConfig {
         stream: options.stream ?? true,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.max_tokens ?? 4096,
+        stream_options: { include_usage: true },
       };
       if (/thinking|reason|glm-z|glm-4\.5/i.test(options.model)) {
         const effort = options.modelOptions?.reasoningEffort

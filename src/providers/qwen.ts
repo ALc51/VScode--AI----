@@ -18,6 +18,9 @@ export function createQwenConfig(): ProviderConfig {
     displayName: "通义千问",
     defaultBaseUrl: API_BASE_URLS.qwen,
     modelsEndpoint: `${API_BASE_URLS.qwen}/v1/models`,
+    billingConsoleUrl: "https://dashscope.console.aliyun.com/billing",
+    supportsBalance: false,
+    includeStreamUsage: true,
     getAuthHeaders(apiKey: string) {
       return { Authorization: `Bearer ${apiKey}` };
     },
@@ -37,6 +40,7 @@ export function createQwenConfig(): ProviderConfig {
         stream: options.stream ?? true,
         temperature: options.temperature ?? 0.7,
         max_tokens: options.max_tokens ?? 4096,
+        stream_options: { include_usage: true },
       };
       if (/qwen.*(3|thinking)|qwq/i.test(options.model)) {
         const effort = options.modelOptions?.reasoningEffort

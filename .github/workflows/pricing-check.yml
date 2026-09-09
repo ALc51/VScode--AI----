@@ -1,0 +1,60 @@
+# Pricing auto-update workflow
+# Runs daily at 2:00 UTC (10:00 Beijing Time)
+# Checks vendor pricing and auto-commits changes
+name: Pricing Check & Update
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  check-pricing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: npx playwright install chromium --with-deps
+
+      - name: Run pricing check
+        id: check
+        env:
+          USE_PLAYWRIGHT: '1'
+        run: |
+          node scripts/check-pricing.mjs > pricing-report.md 2>&1 || true
+          echo "report<<EOF" >> $GITHUB_OUTPUT
+          cat pricing-report.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          if grep -q "Pricing changed" pricing-report.md; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create issue on price changes
+        if: steps.check.outputs.has_changes == 'true'
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          title: "Pricing Change Detected - $(date -u +%Y-%m-%d)"
+          content-filepath: pricing-report.md
+          labels: |
+            pricing-update
+            automated
+
+      - name: Commit pricing updates
+        if: steps.check.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pricing.json
+          git diff --cached --quiet || git commit -m "chore: update pricing.json - $(date -u +%Y-%m-%d)"
+          git push

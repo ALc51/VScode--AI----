@@ -2,6 +2,7 @@ import { getReasoningEffort } from "../types";
 import type { ProviderConfig, ChatRequestOptions, ChatStreamChunk } from "../types";
 import { API_BASE_URLS } from "../config/models";
 import { defaultGetModelMetadata, defaultGetVendorContextLimit } from "./modelMetadataStrategies";
+import { defaultParseBalanceResponse } from "./billingStrategies";
 import { defaultFormatModelDisplayName } from "./displayNameStrategies";
 import {
   defaultHasInferredImageInput,
@@ -18,6 +19,11 @@ export function createKimiConfig(): ProviderConfig {
     displayName: "Kimi",
     defaultBaseUrl: API_BASE_URLS.kimi,
     modelsEndpoint: `${API_BASE_URLS.kimi}/v1/models`,
+    balanceEndpoint: `${API_BASE_URLS.kimi}/v1/users/me/balance`,
+    billingConsoleUrl: "https://platform.moonshot.cn/console/account",
+    supportsBalance: true,
+    parseBalanceResponse: defaultParseBalanceResponse("kimi"),
+    includeStreamUsage: true,
     getAuthHeaders(apiKey: string) {
       return { Authorization: `Bearer ${apiKey}` };
     },
@@ -42,6 +48,7 @@ export function createKimiConfig(): ProviderConfig {
         stream: options.stream ?? true,
         temperature: 1,
         max_tokens: options.max_tokens ?? 4096,
+        stream_options: { include_usage: true },
       };
 
       if (options.model.startsWith("kimi-k3")) {

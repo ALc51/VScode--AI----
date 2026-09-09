@@ -15,6 +15,23 @@ import {
 } from "../src/providers/inferenceStrategies.ts";
 import { createAbortSignal, cancellableSleep } from "../src/utils/cancellation.ts";
 import { ExtensionLogger } from "../src/utils/logger.ts";
+import {
+  defaultParseBalanceResponse,
+  isBalanceSupported,
+  normalizeStreamUsage,
+  splitCacheUsage,
+  cacheHitRate,
+} from "../src/providers/billingStrategies.ts";
+import {
+  BUNDLED_PRICING,
+  diffPricingManifests,
+  estimateCost,
+  getPricingForModel,
+  isPricingManifest,
+  mergePricingManifests,
+} from "../src/config/pricing.ts";
+import { syncPricingManifest } from "../src/utils/pricingSync.ts";
+import { getDailyUsage, recordUsage, summarizeUsage } from "../src/utils/usageStore.ts";
 
 // ── tokenEstimator ────────────────────────────────────────────────
 test("estimateTokens: 空字符串至少返回 1", () => {
@@ -214,3 +231,186 @@ function makeToken(preCancelled = false): unknown {
     },
   };
 }
+
+// ── billingStrategies ───────────────────────────────────────────
+test("billing: DeepSeek balance_infos 解析", () => {
+  const parse = defaultParseBalanceResponse("deepseek");
+  const r = parse(
+    { balance_infos: [{ currency: "CNY", total_balance: 10.5, granted_balance: 2, topped_up_balance: 8.5 }] },
+    "deepseek"
+  );
+  assert.equal(r?.available, 10.5);
+  assert.equal(r?.currency, "CNY");
+});
+
+test("billing: Kimi 多形态余额兼容", () => {
+  const parse = defaultParseBalanceResponse("kimi");
+  assert.equal(parse({ available_balance: 3.2 }, "kimi")?.available, 3.2);
+  assert.equal(parse({ data: { balance: "7" } }, "kimi")?.available, 7);
+  assert.equal(parse({ nope: 1 }, "kimi"), undefined);
+});
+
+test("billing: normalizeStreamUsage 兼容 input/output 命名", () => {
+  assert.deepEqual(normalizeStreamUsage({ usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } }), {
+    prompt_tokens: 10,
+    completion_tokens: 5,
+    total_tokens: 15,
+    prompt_cache_hit_tokens: undefined,
+    prompt_cache_miss_tokens: undefined,
+    cached_tokens: undefined,
+  });
+  const alt = normalizeStreamUsage({ choices: [{ usage: { input_tokens: 4, output_tokens: 6 } }] });
+  assert.equal(alt?.prompt_tokens, 4);
+  assert.equal(alt?.total_tokens, 10);
+  assert.equal(normalizeStreamUsage({ choices: [{}] }), undefined);
+});
+
+test("billing: 缓存命中多形态归一化（details/cached_tokens）", () => {
+  const a = normalizeStreamUsage({ usage: { prompt_tokens: 100, completion_tokens: 10, prompt_cache_hit_tokens: 30, prompt_cache_miss_tokens: 70 } });
+  assert.equal(a?.prompt_cache_hit_tokens, 30);
+  assert.equal(a?.prompt_cache_miss_tokens, 70);
+  const b = normalizeStreamUsage({ usage: { prompt_tokens: 100, completion_tokens: 10, prompt_tokens_details: { cached_tokens: 40 } } });
+  assert.equal(b?.prompt_cache_hit_tokens, 40);
+  const c = normalizeStreamUsage({ usage: { prompt_tokens: 50, cached_tokens: 20 } });
+  assert.equal(c?.prompt_cache_hit_tokens, 20);
+});
+
+test("billing: splitCacheUsage 拆分命中/未命中/输出并钳制异常", () => {
+  assert.deepEqual(splitCacheUsage({ prompt_tokens: 100, completion_tokens: 20, prompt_cache_hit_tokens: 30 }), { hit: 30, miss: 70, output: 20 });
+  // 未返回缓存字段：命中 0、未命中 = 输入
+  assert.deepEqual(splitCacheUsage({ prompt_tokens: 100, completion_tokens: 5 }), { hit: 0, miss: 100, output: 5 });
+  // hit > prompt 防御钳制
+  assert.deepEqual(splitCacheUsage({ prompt_tokens: 10, prompt_cache_hit_tokens: 99 }), { hit: 10, miss: 0, output: 0 });
+  assert.equal(cacheHitRate(30, 70), 0.3);
+  assert.equal(cacheHitRate(0, 0), undefined);
+});
+
+test("billing: isBalanceSupported 以 endpoint 判定", () => {
+  assert.equal(isBalanceSupported({ vendor: "a", displayName: "a", defaultBaseUrl: "https://x", getAuthHeaders: () => ({}), buildRequestBody: () => ({}), parseStreamChunk: () => null, balanceEndpoint: "https://x/b" } as never), true);
+  assert.equal(isBalanceSupported({ vendor: "a", displayName: "a", defaultBaseUrl: "https://x", getAuthHeaders: () => ({}), buildRequestBody: () => ({}), parseStreamChunk: () => null, supportsBalance: false } as never), false);
+});
+
+// ── pricing ─────────────────────────────────────────────────────
+test("pricing: 精确条目优先于通用回退", () => {
+  const pro = getPricingForModel("deepseek", "deepseek-v4-pro");
+  assert.equal(pro?.inputPer1k, 0.0048);
+  const flash = getPricingForModel("deepseek", "deepseek-v4-flash-thinking");
+  assert.equal(flash?.inputPer1k, 0.0016);
+  assert.equal(getPricingForModel("qwen", "unknown-xyz"), undefined);
+});
+
+test("pricing: estimateCost 按 1K 单价计算", () => {
+  const entry = getPricingForModel("kimi", "kimi-k3");
+  // Kimi K3: input ¥20/1M → 0.020/1K, output ¥100/1M → 0.100/1K
+  // 1000 input + 1000 output = 0.020 + 0.100 = 0.120
+  assert.ok(Math.abs((estimateCost(entry, 1000, 1000) ?? 0) - 0.120) < 1e-9);
+  assert.equal(estimateCost(undefined, 1, 1), undefined);
+});
+
+test("pricing: 远端覆盖本地同 key", () => {
+  const merged = mergePricingManifests(BUNDLED_PRICING, {
+    version: 2,
+    updatedAt: "2026-09-07",
+    entries: [{ vendor: "kimi", pattern: "^kimi-k3$", inputPer1k: 0.02, outputPer1k: 0.05, currency: "CNY", effectiveDate: "2026-09-07" }],
+  });
+  assert.equal(getPricingForModel("kimi", "kimi-k3", merged)?.inputPer1k, 0.02);
+  assert.equal(merged.version, 2);
+});
+
+test("pricing: 非法 manifest 判定失败", () => {
+  assert.equal(isPricingManifest({ entries: [{ vendor: "x" }] }), false);
+  assert.equal(isPricingManifest(BUNDLED_PRICING), true);
+});
+
+test("pricing: diffPricingManifests 检测变更", () => {
+  const changes = diffPricingManifests(BUNDLED_PRICING, {
+    version: 3,
+    updatedAt: "2026-09-10",
+    entries: [
+      // 价格变更
+      { vendor: "kimi", pattern: "^kimi-k3$", inputPer1k: 0.025, outputPer1k: 0.100, currency: "CNY", effectiveDate: "2026-09-10" },
+      // 未变更
+      ...BUNDLED_PRICING.entries.filter((e) => !(e.vendor === "kimi" && e.pattern === "^kimi-k3$")),
+    ],
+  });
+  assert.ok(changes.length > 0);
+  assert.equal(changes[0].vendor, "kimi");
+  assert.equal(changes[0].field, "输入(未命中)");
+  // 相同清单应返回空变更
+  const noChanges = diffPricingManifests(BUNDLED_PRICING, BUNDLED_PRICING);
+  assert.equal(noChanges.length, 0);
+});
+
+test("pricingSync: 远端失败回退捆绑表", async () => {
+  const mem = new Map<string, unknown>();
+  const store = { get: (k: string) => mem.get(k), update: (k: string, v: unknown) => { mem.set(k, v); } };
+  const failing = async () => { throw new Error("down"); };
+  const r = await syncPricingManifest(store, { force: true, fetchFn: failing as never });
+  assert.equal(r.source, "bundled");
+  assert.equal(r.manifest.version, BUNDLED_PRICING.version);
+});
+
+test("pricingSync: 304 沿用缓存", async () => {
+  const mem = new Map<string, unknown>([["billing.pricingManifest", BUNDLED_PRICING]]);
+  const store = { get: (k: string) => mem.get(k), update: (k: string, v: unknown) => { mem.set(k, v); } };
+  const notModified = async () => ({ status: 304, ok: false, body: { cancel: async () => undefined }, headers: { get: () => null } });
+  const r = await syncPricingManifest(store, { force: true, fetchFn: notModified as never });
+  assert.equal(r.source, "cache");
+});
+
+// ── usageStore ──────────────────────────────────────────────────
+function makeMemStore(): { get(k: string): unknown; update(k: string, v: unknown): void; mem: Map<string, unknown> } {
+  const mem = new Map<string, unknown>();
+  return { mem, get: (k: string) => mem.get(k), update: (k: string, v: unknown) => { mem.set(k, v); } };
+}
+
+test("usageStore: 累加同日同模型用量与费用", () => {
+  const s = makeMemStore();
+  recordUsage(s, "kimi", "kimi-k3", { prompt_tokens: 1000, completion_tokens: 500, total_tokens: 1500 }, BUNDLED_PRICING);
+  recordUsage(s, "kimi", "kimi-k3", { prompt_tokens: 1000, completion_tokens: 500, total_tokens: 1500 }, BUNDLED_PRICING);
+  const daily = getDailyUsage(s);
+  assert.equal(daily.length, 1);
+  assert.equal(daily[0].totalTokens, 3000);
+  assert.equal(daily[0].count, 2);
+  assert.ok((daily[0].estimatedCost ?? 0) > 0);
+  const sum = summarizeUsage(daily);
+  assert.equal(sum.totalTokens, 3000);
+});
+
+test("usageStore: 无定价时仅记 tokens", () => {
+  const s = makeMemStore();
+  const r = recordUsage(s, "x", "m", { total_tokens: 9 });
+  assert.equal(r.totalTokens, 9);
+  assert.equal(r.estimatedCost, undefined);
+});
+
+test("usageStore: 多厂商混合时可按 vendor 过滤（单厂商面板用）", () => {
+  const s = makeMemStore();
+  recordUsage(s, "kimi", "kimi-k3", { total_tokens: 100 }, BUNDLED_PRICING);
+  recordUsage(s, "deepseek", "deepseek-v4-pro", { total_tokens: 200 }, BUNDLED_PRICING);
+  const kimiOnly = getDailyUsage(s).filter((r) => r.vendor === "kimi");
+  assert.equal(kimiOnly.length, 1);
+  assert.equal(summarizeUsage(kimiOnly).totalTokens, 100);
+  const dsOnly = getDailyUsage(s).filter((r) => r.vendor === "deepseek");
+  assert.equal(summarizeUsage(dsOnly).totalTokens, 200);
+});
+
+test("usageStore: 缓存命中拆分累计与命中率", () => {
+  const s = makeMemStore();
+  recordUsage(s, "deepseek", "deepseek-v4-pro", { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, prompt_cache_hit_tokens: 30, prompt_cache_miss_tokens: 70 }, BUNDLED_PRICING);
+  recordUsage(s, "deepseek", "deepseek-v4-pro", { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, prompt_cache_hit_tokens: 50, prompt_cache_miss_tokens: 50 }, BUNDLED_PRICING);
+  const sum = summarizeUsage(getDailyUsage(s));
+  assert.equal(sum.cacheHitTokens, 80);
+  assert.equal(sum.cacheMissTokens, 120);
+  assert.equal(sum.completionTokens, 40);
+  assert.ok(Math.abs((sum.hitRate ?? 0) - 0.4) < 1e-9);
+});
+
+test("usageStore: 无缓存字段时命中率 undefined（UI 显示 -）", () => {
+  const s = makeMemStore();
+  recordUsage(s, "kimi", "kimi-k3", { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 });
+  const sum = summarizeUsage(getDailyUsage(s));
+  assert.equal(sum.cacheHitTokens, 0);
+  assert.equal(sum.cacheMissTokens, 10);
+  assert.equal(sum.hitRate, 0);
+});

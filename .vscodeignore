@@ -1,6 +1,7 @@
 .vscode/**
 .vscode-test/**
 src/**
+!media/**
 .gitignore
 .eslintrc.json
 **/*.ts
