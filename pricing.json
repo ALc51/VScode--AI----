@@ -171,7 +171,7 @@
       "pattern": "^mimo-v2\\.5",
       "inputPer1k": 0.001,
       "outputPer1k": 0.002,
-      "cacheHitPer1k": 0.00002,
+      "cacheHitPer1k": 0.000025,
       "currency": "CNY",
       "effectiveDate": "2026-09-08",
       "sourceUrl": "https://mimo.mi.com/docs/price/pay-as-you-go"
