@@ -45,6 +45,11 @@ export class BaseLanguageModelProvider
     this.modelChangeEmitter.dispose();
   }
 
+  /** 通知 VS Code 模型信息已变更，触发 UI 刷新（如定价更新后） */
+  notifyModelChange(): void {
+    this.modelChangeEmitter.fire();
+  }
+
   constructor(
     protected readonly config: ProviderConfig,
     private readonly modelCache?: vscode.Memento

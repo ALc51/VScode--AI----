@@ -47,6 +47,11 @@ export function activate(context: vscode.ExtensionContext) {
     );
   }
 
+  // 通知 VS Code 刷新模型信息（清除旧的模型缓存，确保新定价生效）
+  for (const p of providers) {
+    p.notifyModelChange();
+  }
+
   // 账单服务：余额/用量/定价统一调度（单厂商 + SWR + 去重 + 去抖）
   const billing = new BillingService(providers, context.globalState);
   context.subscriptions.push(billing);

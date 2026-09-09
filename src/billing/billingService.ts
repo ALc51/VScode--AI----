@@ -223,6 +223,13 @@ export class BillingService implements vscode.Disposable {
     const oldManifest = getCachedPricingManifest(this.adaptStore());
     const result = await syncPricingManifest(this.adaptStore(), { force });
 
+    // 诊断日志：输出同步结果和关键定价条目
+    const xiaomiEntries = result.manifest.entries.filter((e) => e.vendor === "xiaomi");
+    ExtensionLogger.get().info(
+      `[定价同步] source=${result.source}, version=${result.manifest.version}, ` +
+      `entries=${result.manifest.entries.length}, xiaomi=${JSON.stringify(xiaomiEntries.map(e => ({ p: e.pattern, in: e.inputPer1k, out: e.outputPer1k, hit: e.cacheHitPer1k })))}`
+    );
+
     // 检测定价变更并通知用户
     if (result.source === "remote") {
       const changes = diffPricingManifests(oldManifest, result.manifest);
