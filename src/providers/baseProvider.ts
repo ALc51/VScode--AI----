@@ -7,7 +7,7 @@ import { ExtensionLogger } from "../utils/logger";
 import { defaultParseBalanceResponse, isBalanceSupported, normalizeStreamUsage } from "./billingStrategies";
 import { recordUsage } from "../utils/usageStore";
 import { getCachedPricingManifest } from "../utils/pricingSync";
-import { getPricingForModel, BUNDLED_PRICING } from "../config/pricing";
+import { getPricingForModel, BUNDLED_PRICING, BUNDLED_PRICING_VERSION } from "../config/pricing";
 import { KNOWN_CHAT_MODELS } from "../config/models";
 import { getOfficialModelMetadata } from "../config/modelMetadata";
 import {
@@ -127,7 +127,8 @@ export class BaseLanguageModelProvider
         name: m.name,
         vendor: m.vendor,
         family: m.family,
-        version: m.version,
+        // 将定价版本号附加到 model version，确保定价变更时 VS Code 检测到模型信息变化并刷新
+        version: `${m.version}-p${BUNDLED_PRICING_VERSION}`,
         maxInputTokens: m.maxInputTokens,
         maxOutputTokens: m.maxOutputTokens ?? 4096,
         capabilities: {

@@ -229,13 +229,13 @@ export const BUNDLED_PRICING: PricingManifest = {
       effectiveDate: "2026-09-08",
       sourceUrl: "https://mimo.mi.com/docs/price/pay-as-you-go",
     },
-    // MiMo V2.5: input ¥1/1M, output ¥2/1M, cache hit ¥0.025/1M
+    // MiMo V2.5: input ¥1/1M, output ¥2/1M, cache hit ¥0.02/1M
     {
       vendor: "xiaomi",
       pattern: "^mimo-v2\\.5",
       inputPer1k: 0.001,
       outputPer1k: 0.002,
-      cacheHitPer1k: 0.000025,
+      cacheHitPer1k: 0.00002,
       currency: "CNY",
       effectiveDate: "2026-09-08",
       sourceUrl: "https://mimo.mi.com/docs/price/pay-as-you-go",
