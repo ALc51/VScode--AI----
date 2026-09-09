@@ -24,6 +24,11 @@ export function activate(context: vscode.ExtensionContext) {
   ExtensionLogger.get().init(outputChannel);
   ExtensionLogger.get().info("扩展 activate() 开始执行");
 
+  // 清除旧定价缓存，确保代码更新后 BUNDLED_PRICING 立即生效
+  void context.globalState.update("billing.pricingManifest", undefined);
+  void context.globalState.update("billing.pricingEtag", undefined);
+  void context.globalState.update("billing.pricingCheckedAt", undefined);
+
   const vendorConfigs: ProviderConfig[] = [
     createDeepseekConfig(),
     createQwenConfig(),
