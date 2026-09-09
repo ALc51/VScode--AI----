@@ -38,25 +38,31 @@ export function activate(context: vscode.ExtensionContext) {
   ];
 
   const providers: BaseLanguageModelProvider[] = [];
+  const registrations: vscode.Disposable[] = [];
   for (const config of vendorConfigs) {
     const provider = new BaseLanguageModelProvider(config, context.globalState);
     providers.push(provider);
     context.subscriptions.push(provider);
-    context.subscriptions.push(
-      vscode.lm.registerLanguageModelChatProvider(config.vendor, provider)
-    );
+    const reg = vscode.lm.registerLanguageModelChatProvider(config.vendor, provider);
+    registrations.push(reg);
+    context.subscriptions.push(reg);
   }
 
-  // 延迟通知 VS Code 刷新模型信息，确保注册完成后触发
-  setTimeout(() => {
-    for (const p of providers) {
-      p.notifyModelChange();
+  // 注销再重新注册所有 provider，强制 VS Code 重新调用 provideLanguageModelChatInformation
+  // 这是唯一能强制 VS Code 刷新模型定价数据的方式
+  function reregisterProviders() {
+    for (let i = 0; i < registrations.length; i++) {
+      registrations[i].dispose();
+      registrations[i] = vscode.lm.registerLanguageModelChatProvider(vendorConfigs[i].vendor, providers[i]);
     }
-    ExtensionLogger.get().info("已通知 VS Code 刷新模型信息（定价版本更新）");
-  }, 1000);
+    ExtensionLogger.get().info("已重新注册所有 Provider（定价刷新）");
+  }
+
+  // 延迟重新注册，确保 VS Code 已完成初始化
+  setTimeout(reregisterProviders, 1500);
 
   // 账单服务：余额/用量/定价统一调度（单厂商 + SWR + 去重 + 去抖）
-  const billing = new BillingService(providers, context.globalState);
+  const billing = new BillingService(providers, context.globalState, reregisterProviders);
   context.subscriptions.push(billing);
   const dashboard = new BillingDashboard(billing, context.extensionUri);
   context.subscriptions.push(dashboard);

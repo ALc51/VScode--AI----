@@ -27,7 +27,8 @@ export class BillingService implements vscode.Disposable {
 
   constructor(
     private readonly providers: BaseLanguageModelProvider[],
-    private readonly state: vscode.Memento
+    private readonly state: vscode.Memento,
+    private readonly onPricingRefreshed?: () => void
   ) {
     for (const p of providers) {
       p.onUsage((usage: ChatStreamUsage, modelId: string) => this.handleUsage(p.vendor, usage, modelId));
@@ -223,11 +224,9 @@ export class BillingService implements vscode.Disposable {
     const oldManifest = getCachedPricingManifest(this.adaptStore());
     const result = await syncPricingManifest(this.adaptStore(), { force });
 
-    // 强制刷新时通知 VS Code 刷新模型信息（模型选择器/语言模型视图）
+    // 强制刷新时重新注册 provider，强制 VS Code 重新查询模型信息（包括定价）
     if (force) {
-      for (const p of this.providers) {
-        p.notifyModelChange();
-      }
+      this.onPricingRefreshed?.();
     }
 
     // 检测定价变更并通知用户
