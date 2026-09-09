@@ -218,39 +218,30 @@ export class BillingService implements vscode.Disposable {
     return getCachedPricingManifest(this.adaptStore());
   }
 
-  /** 定价同步（启动异步一次 + 每6小时 + 手动），不阻塞 */
+  /** 定价同步（启动异步一次 + 手动），不阻塞 */
   async syncPricing(force = false): Promise<void> {
     const oldManifest = getCachedPricingManifest(this.adaptStore());
     const result = await syncPricingManifest(this.adaptStore(), { force });
 
-    // 诊断日志：输出同步结果和关键定价条目
-    const xiaomiEntries = result.manifest.entries.filter((e) => e.vendor === "xiaomi");
-    ExtensionLogger.get().info(
-      `[定价同步] source=${result.source}, version=${result.manifest.version}, ` +
-      `entries=${result.manifest.entries.length}, xiaomi=${JSON.stringify(xiaomiEntries.map(e => ({ p: e.pattern, in: e.inputPer1k, out: e.outputPer1k, hit: e.cacheHitPer1k })))}`
-    );
+    // 强制刷新时通知 VS Code 刷新模型信息（模型选择器/语言模型视图）
+    if (force) {
+      for (const p of this.providers) {
+        p.notifyModelChange();
+      }
+    }
 
     // 检测定价变更并通知用户
-    if (result.source === "remote") {
-      const changes = diffPricingManifests(oldManifest, result.manifest);
-      if (changes.length > 0) {
-        const vendors = [...new Set(changes.map((c) => c.vendor))];
-        const summary = changes
-          .slice(0, 5)
-          .map((c) => `${c.vendor} ${c.model}: ${c.field}`)
-          .join("\n");
-        const more = changes.length > 5 ? `\n…及其他 ${changes.length - 5} 项变更` : "";
-        void vscode.window.showInformationMessage(
-          `💰 定价已更新 (${vendors.join(", ")})`,
-          "查看详情"
-        ).then((action) => {
-          if (action === "查看详情") {
-            ExtensionLogger.get().info(
-              `定价变更详情:\n${summary}${more}\n来源: 远端 Gist, 版本 ${result.manifest.version}`
-            );
-          }
-        });
-      }
+    const changes = diffPricingManifests(oldManifest, result.manifest);
+    if (changes.length > 0) {
+      const vendors = [...new Set(changes.map((c) => c.vendor))];
+      ExtensionLogger.get().info(
+        `[定价同步] source=${result.source}, version=${result.manifest.version}, 变更=${changes.length}项`
+      );
+      void vscode.window.showInformationMessage(
+        `💰 定价已刷新 (${vendors.join(", ")})`
+      );
+    } else if (force) {
+      void vscode.window.showInformationMessage("💰 定价已是最新");
     }
 
     this.changeEmitter.fire();

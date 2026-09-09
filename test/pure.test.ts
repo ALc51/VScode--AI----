@@ -341,20 +341,18 @@ test("pricing: diffPricingManifests 检测变更", () => {
   assert.equal(noChanges.length, 0);
 });
 
-test("pricingSync: 远端失败回退捆绑表", async () => {
+test("pricingSync: force=true 直接返回 BUNDLED_PRICING", async () => {
   const mem = new Map<string, unknown>();
   const store = { get: (k: string) => mem.get(k), update: (k: string, v: unknown) => { mem.set(k, v); } };
-  const failing = async () => { throw new Error("down"); };
-  const r = await syncPricingManifest(store, { force: true, fetchFn: failing as never });
+  const r = await syncPricingManifest(store, { force: true });
   assert.equal(r.source, "bundled");
   assert.equal(r.manifest.version, BUNDLED_PRICING.version);
 });
 
-test("pricingSync: 304 沿用缓存", async () => {
-  const mem = new Map<string, unknown>([["billing.pricingManifest", BUNDLED_PRICING]]);
+test("pricingSync: 缓存未过期返回缓存", async () => {
+  const mem = new Map<string, unknown>([["billing.pricingManifest", BUNDLED_PRICING], ["billing.pricingCheckedAt", Date.now()]]);
   const store = { get: (k: string) => mem.get(k), update: (k: string, v: unknown) => { mem.set(k, v); } };
-  const notModified = async () => ({ status: 304, ok: false, body: { cancel: async () => undefined }, headers: { get: () => null } });
-  const r = await syncPricingManifest(store, { force: true, fetchFn: notModified as never });
+  const r = await syncPricingManifest(store, { force: false });
   assert.equal(r.source, "cache");
 });
 
