@@ -114,7 +114,9 @@ export class BaseLanguageModelProvider
       const inputMiss1M = pricingEntry ? (pricingEntry.inputPer1k * 1000).toFixed(2) : undefined;
       const output1M = pricingEntry ? (pricingEntry.outputPer1k * 1000).toFixed(2) : undefined;
       // 缓存命中价格通常很小（如 ¥0.025/1M），需要更多小数位避免 .toFixed(2) 舍入误差
-      const inputHit1M = pricingEntry?.cacheHitPer1k ? (pricingEntry.cacheHitPer1k * 1000).toFixed(4) : undefined;
+      const inputHit1M = pricingEntry?.cacheHitPer1k
+        ? parseFloat((pricingEntry.cacheHitPer1k * 1000).toFixed(4)).toString()
+        : undefined;
 
       // 价格分类：根据缓存未命中输入价格判定（CNY/1M tokens）
       const priceCategory = inputMiss1M
