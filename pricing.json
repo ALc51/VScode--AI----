@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "updatedAt": "2026-09-08",
+  "entries": [
+    {
+      "vendor": "deepseek",
+      "pattern": "^deepseek-v4-pro$",
+      "inputPer1k": 0.0048,
+      "outputPer1k": 0.0144,
+      "cacheHitPer1k": 0.0016,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "vendor": "deepseek",
+      "pattern": "^deepseek-v4-flash",
+      "inputPer1k": 0.0016,
+      "outputPer1k": 0.0048,
+      "cacheHitPer1k": 0.00005,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "vendor": "deepseek",
+      "pattern": "deepseek",
+      "inputPer1k": 0.002,
+      "outputPer1k": 0.006,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "vendor": "kimi",
+      "pattern": "^kimi-k3$",
+      "inputPer1k": 0.020,
+      "outputPer1k": 0.100,
+      "cacheHitPer1k": 0.002,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://platform.kimi.com/docs/pricing/chat-k3"
+    },
+    {
+      "vendor": "kimi",
+      "pattern": "^kimi-k2\\.7-code-highspeed$",
+      "inputPer1k": 0.013,
+      "outputPer1k": 0.054,
+      "cacheHitPer1k": 0.0026,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://platform.kimi.com/docs/pricing/chat-k27-code"
+    },
+    {
+      "vendor": "kimi",
+      "pattern": "^kimi-k2\\.7-code$",
+      "inputPer1k": 0.0065,
+      "outputPer1k": 0.027,
+      "cacheHitPer1k": 0.0013,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://platform.kimi.com/docs/pricing/chat-k27-code"
+    },
+    {
+      "vendor": "kimi",
+      "pattern": "^kimi-k2\\.6$",
+      "inputPer1k": 0.0065,
+      "outputPer1k": 0.027,
+      "cacheHitPer1k": 0.0011,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://platform.kimi.com/docs/pricing/chat-k26"
+    },
+    {
+      "vendor": "kimi",
+      "pattern": "kimi|moonshot",
+      "inputPer1k": 0.008,
+      "outputPer1k": 0.027,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://platform.kimi.com/docs/pricing"
+    },
+    {
+      "vendor": "qwen",
+      "pattern": "^qwen3\\.(7-plus|8-max)|^qwen-max",
+      "inputPer1k": 0.020,
+      "outputPer1k": 0.060,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-generation-model/"
+    },
+    {
+      "vendor": "qwen",
+      "pattern": "qwen",
+      "inputPer1k": 0.004,
+      "outputPer1k": 0.012,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-generation-model/"
+    },
+    {
+      "vendor": "zhipu",
+      "pattern": "^glm-5\\.3$",
+      "inputPer1k": 0.008,
+      "outputPer1k": 0.028,
+      "cacheHitPer1k": 0.002,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://open.bigmodel.cn/pricing"
+    },
+    {
+      "vendor": "zhipu",
+      "pattern": "^glm-5\\.3-flash",
+      "inputPer1k": 0.0008,
+      "outputPer1k": 0.0028,
+      "cacheHitPer1k": 0.00023,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://open.bigmodel.cn/pricing"
+    },
+    {
+      "vendor": "zhipu",
+      "pattern": "^glm-5\\.2$",
+      "inputPer1k": 0.008,
+      "outputPer1k": 0.028,
+      "cacheHitPer1k": 0.002,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://open.bigmodel.cn/pricing"
+    },
+    {
+      "vendor": "zhipu",
+      "pattern": "^glm-5",
+      "inputPer1k": 0.008,
+      "outputPer1k": 0.028,
+      "cacheHitPer1k": 0.002,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://open.bigmodel.cn/pricing"
+    },
+    {
+      "vendor": "zhipu",
+      "pattern": "^glm-4",
+      "inputPer1k": 0.005,
+      "outputPer1k": 0.015,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://open.bigmodel.cn/pricing"
+    },
+    {
+      "vendor": "zhipu",
+      "pattern": "glm",
+      "inputPer1k": 0.005,
+      "outputPer1k": 0.015,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://open.bigmodel.cn/pricing"
+    },
+    {
+      "vendor": "xiaomi",
+      "pattern": "^mimo-v2\\.5-pro",
+      "inputPer1k": 0.003,
+      "outputPer1k": 0.006,
+      "cacheHitPer1k": 0.000025,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    },
+    {
+      "vendor": "xiaomi",
+      "pattern": "^mimo-v2\\.5",
+      "inputPer1k": 0.001,
+      "outputPer1k": 0.002,
+      "cacheHitPer1k": 0.00002,
+      "currency": "CNY",
+      "effectiveDate": "2026-09-08",
+      "sourceUrl": "https://mimo.mi.com/docs/price/pay-as-you-go"
+    }
+  ]
+}
