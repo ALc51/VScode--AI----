@@ -51,11 +51,17 @@ export function activate(context: vscode.ExtensionContext) {
   // 注销再重新注册所有 provider，强制 VS Code 重新调用 provideLanguageModelChatInformation
   // 这是唯一能强制 VS Code 刷新模型定价数据的方式
   function reregisterProviders() {
-    for (let i = 0; i < registrations.length; i++) {
-      registrations[i].dispose();
-      registrations[i] = vscode.lm.registerLanguageModelChatProvider(vendorConfigs[i].vendor, providers[i]);
+    // 先注销所有 provider
+    for (const reg of registrations) {
+      reg.dispose();
     }
-    ExtensionLogger.get().info("已重新注册所有 Provider（定价刷新）");
+    // 延迟后重新注册，确保 VS Code 已清除内部缓存
+    setTimeout(() => {
+      for (let i = 0; i < vendorConfigs.length; i++) {
+        registrations[i] = vscode.lm.registerLanguageModelChatProvider(vendorConfigs[i].vendor, providers[i]);
+      }
+      ExtensionLogger.get().info("已重新注册所有 Provider（定价刷新）");
+    }, 500);
   }
 
   // 延迟重新注册，确保 VS Code 已完成初始化
