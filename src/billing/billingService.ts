@@ -238,10 +238,10 @@ export class BillingService implements vscode.Disposable {
         `[定价同步] source=${result.source}, version=${result.manifest.version}, 变更=${changes.length}项`
       );
       void vscode.window.showInformationMessage(
-        `💰 定价已刷新 (${vendors.join(", ")})`
+        `💰 定价已刷新 (${vendors.join(", ")}) [${result.source === "remote" ? "远端" : "本地"}]`
       );
     } else if (force) {
-      void vscode.window.showInformationMessage("💰 定价已是最新");
+      void vscode.window.showInformationMessage(`💰 定价已是最新 [${result.source === "remote" ? "远端" : "本地"}]`);
     }
 
     this.changeEmitter.fire();

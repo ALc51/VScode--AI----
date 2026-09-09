@@ -341,11 +341,12 @@ test("pricing: diffPricingManifests 检测变更", () => {
   assert.equal(noChanges.length, 0);
 });
 
-test("pricingSync: force=true 直接返回 BUNDLED_PRICING", async () => {
+test("pricingSync: force=true 尝试远端后回退 BUNDLED_PRICING", async () => {
   const mem = new Map<string, unknown>();
   const store = { get: (k: string) => mem.get(k), update: (k: string, v: unknown) => { mem.set(k, v); } };
+  // 远端不可达时回退到 bundled
   const r = await syncPricingManifest(store, { force: true });
-  assert.equal(r.source, "bundled");
+  assert.ok(r.source === "bundled" || r.source === "remote");
   assert.equal(r.manifest.version, BUNDLED_PRICING.version);
 });
 
