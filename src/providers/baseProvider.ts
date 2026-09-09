@@ -105,6 +105,7 @@ export class BaseLanguageModelProvider
 
     // 获取当前定价清单，用于注入模型定价信息（使用捆绑兜底表；远端同步由 BillingService 驱动）
     const pricingManifest = BUNDLED_PRICING;
+    ExtensionLogger.get().info(`[provideLMInfo] vendor=${this.config.vendor}, models=${this.cachedModels?.length ?? 0}, pricingVersion=${BUNDLED_PRICING_VERSION}`);
 
     return (this.cachedModels ?? []).map((m) => {
       const pricingEntry = getPricingForModel(this.config.vendor, m.id, pricingManifest);
@@ -112,7 +113,8 @@ export class BaseLanguageModelProvider
       // inputPer1k = 缓存未命中（cache miss）输入价格；cacheHitPer1k = 缓存命中（cache hit）输入价格
       const inputMiss1M = pricingEntry ? (pricingEntry.inputPer1k * 1000).toFixed(2) : undefined;
       const output1M = pricingEntry ? (pricingEntry.outputPer1k * 1000).toFixed(2) : undefined;
-      const inputHit1M = pricingEntry?.cacheHitPer1k ? (pricingEntry.cacheHitPer1k * 1000).toFixed(2) : undefined;
+      // 缓存命中价格通常很小（如 ¥0.025/1M），需要更多小数位避免 .toFixed(2) 舍入误差
+      const inputHit1M = pricingEntry?.cacheHitPer1k ? (pricingEntry.cacheHitPer1k * 1000).toFixed(4) : undefined;
 
       // 价格分类：根据缓存未命中输入价格判定（CNY/1M tokens）
       const priceCategory = inputMiss1M
